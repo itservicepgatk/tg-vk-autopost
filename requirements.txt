@@ -1,0 +1,4 @@
+telethon
+vk_api
+pillow
+python-dotenv
