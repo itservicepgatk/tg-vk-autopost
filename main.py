@@ -132,11 +132,10 @@ def to_webp(path):
         os.remove(path)
         return new_name
     except Exception as e:
-        # print(f"Не смог конвертировать: {e}") 
         return path # Возвращаем оригинал если не вышло
 
 def upload_vk_photo(paths):
-    # Грузим пачкой
+    # Грузим пачкой (синхронно, т.к. либа старая)
     if not paths: return []
     # Фильтруем пустые
     real_paths = [p for p in paths if p]
@@ -161,8 +160,10 @@ async def get_last_id():
         # Читаем последнее сообщение из лог-канала
         msgs = await client.get_messages(LOG_CHANNEL_ID, limit=1)
         if msgs:
+            # Безопасно берем текст, даже если там None
+            text_content = msgs[0].text or ""
             # Ищем цифры в тексте
-            found = re.search(r'(\d+)', msgs[0].text)
+            found = re.search(r'(\d+)', text_content)
             if found:
                 return int(found.group(1))
     except Exception as e:
@@ -301,8 +302,8 @@ async def run_bot():
                 ]
                 webp_files = await asyncio.gather(*convert_jobs)
                 
-                # Грузим в ВК
-                vk_atts = await upload_vk_photo(webp_files)
+                # Грузим в ВК (БЕЗ await, так как функция обычная)
+                vk_atts = upload_vk_photo(webp_files)
                 
                 # Удаляем временные webp
                 for f in webp_files:
