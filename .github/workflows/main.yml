@@ -1,9 +1,14 @@
 name: AutoPost Bot
 
 on:
-  # Запуск по расписанию (каждые 2 часа)
+  # Расписание (время указывается в UTC)
+  # Минск = UTC+3, поэтому отнимаем 3 часа от желаемого времени.
+  # 5:30 UTC = 08:30 Минск (Первый запуск)
+  # 20:30 UTC = 23:30 Минск (Последний запуск)
   schedule:
-    - cron: '0 */2 * * *'
+    - cron: '30 5-20 * * *'
+  
+  # Возможность ручного запуска кнопки в GitHub
   workflow_dispatch:
 
 jobs:
@@ -12,10 +17,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
