@@ -9,6 +9,7 @@ import time
 from PIL import Image, ImageDraw, ImageFont
 from telethon import TelegramClient
 import vk_api
+from vk_api.exceptions import ApiError
 from dotenv import load_dotenv
 
 # Подгружаем конфиг
@@ -95,6 +96,13 @@ def upload_vk_photo(paths):
             up = uploader.photo_wall(p)
             att = f"photo{up[0]['owner_id']}_{up[0]['id']}"
             uploaded_tags.append(att)
+        except ApiError as e:
+            err_str = str(e)
+            # Если токен невалиден или приложение заблокировано — прокидываем ошибку дальше
+            if "[5]" in err_str or "[8]" in err_str or "[28]" in err_str:
+                raise e 
+            print(f"❌ Ошибка загрузки {p}: {e}")
+            continue
         except Exception as e:
             print(f"❌ Ошибка загрузки {p}: {e}")
             continue
@@ -120,7 +128,7 @@ async def set_last_id(new_id):
 
 async def run_bot():
     print("--------------------------------")
-    print("🚀 Бот запускается (v16.0 No Author)...")
+    print("🚀 Бот запускается (v17.0 Auto-Notify)...")
     print("--------------------------------")
     
     async with client:
@@ -214,34 +222,52 @@ async def run_bot():
             total_files = dl_files + local_files
             vk_atts = []
             
-            if total_files:
-                print("   📤 Загрузка оригиналов в ВК...")
-                vk_atts = upload_vk_photo(total_files)
-                for f in total_files:
-                    try: 
-                        if f and os.path.exists(f): os.remove(f)
-                    except: pass
-
-            if not clean_txt and not vk_atts:
-                print("   ⚠️ Пост пустой, скипаем.")
-                await set_last_id(top_msg.id)
-                continue
-
             try:
+                # Попытка загрузить фото и запостить
+                if total_files:
+                    print("   📤 Загрузка оригиналов в ВК...")
+                    vk_atts = upload_vk_photo(total_files)
+                    for f in total_files:
+                        try: 
+                            if f and os.path.exists(f): os.remove(f)
+                        except: pass
+
+                if not clean_txt and not vk_atts:
+                    print("   ⚠️ Пост пустой, скипаем.")
+                    await set_last_id(top_msg.id)
+                    continue
+
                 vk.wall.post(
                     owner_id=-VK_GROUP,
                     from_group=1,
                     message=clean_txt,
                     attachments=','.join(vk_atts),
-                    # ВОТ ЭТА МАГИЧЕСКАЯ НАСТРОЙКА:
-                    signed=0  # 0 = Без подписи (Анонимно от группы)
+                    signed=0  
                 )
                 print("   ✅ Готово!")
                 await set_last_id(top_msg.id)
                 time.sleep(3)
                 
+            except ApiError as e:
+                err_str = str(e)
+                print(f"   🔥 Ошибка API ВК: {err_str}")
+                
+                # Проверяем коды критических ошибок авторизации (5, 8, 28)
+                if "[5]" in err_str or "[8]" in err_str or "[28]" in err_str:
+                    error_msg = (
+                        f"🚨 <b>АХТУНГ! Автопостер остановлен!</b>\n\n"
+                        f"Сгорел или заблокирован токен ВКонтакте.\n"
+                        f"Ошибка: <code>{err_str}</code>\n\n"
+                        f"Выпустите новый токен и обновите его в GitHub Actions."
+                        f"```katemobile\nhttps://oauth.vk.com/authorize?client_id=2685278&display=page&redirect_uri=https://oauth.vk.com/blank.html&scope=offline,wall,photos&response_type=token&v=5.199```"
+                    )
+                    # Отправляем себе в избранное
+                    await client.send_message('me', error_msg, parse_mode='html')
+                    print("⛔ Работа прервана. Требуется новый токен ВК.")
+                    break # Останавливаем цикл, чтобы не потерять следующие посты
+
             except Exception as e:
-                print(f"   🔥 Ошибка публикации: {e}")
+                print(f"   🔥 Неизвестная ошибка публикации: {e}")
 
     print("\n🏁 Всё сделано.")
 
