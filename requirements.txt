@@ -1,4 +1,2 @@
-telethon
-vk_api
-pillow
-python-dotenv
+requests==2.31.0
+beautifulsoup4==4.12.3
